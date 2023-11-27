@@ -47,12 +47,20 @@ def generate_data_sensor_array(sensor_arr):
 app = func.FunctionApp()
 
 
-@app.function_name(name="HttpExample")
-@app.route(route="hello")
+@app.function_name(name="SensorGeneration")
+@app.route(route="getData")
 def test_function(req: func.HttpRequest) -> func.HttpResponse:
-    s_arr = init_sensor_array(10)
+
+    sensors_num = req.params.get('num')
+    if sensors_num:
+        sensors_num = int(sensors_num)
+    else:
+        sensors_num = 20
+
+    s_arr = init_sensor_array(sensors_num)
     str = s_arr.__str__() + "\n\n\n"
     for i in range(5):
         generate_data_sensor_array(s_arr)
         str += s_arr.__str__() + "\n\n\n"
+
     return func.HttpResponse(f"Hi me,\n\n{str}")
