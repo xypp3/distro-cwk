@@ -93,19 +93,10 @@ def test_function(req: func.HttpRequest, db: func.Out[func.SqlRow]) -> func.Http
     conn = pyodbc.connect(connection_string, autocommit=True)
 
     # insert data to cursor
-    times = 5
-    for i in range(times):
-        for s in s_arr:
-            SQL_INSERT = "INSERT INTO [dbo].[SensorData] (sensor_id, temperature, wind_speed, relative_humidity, co2) VALUES (?, ?, ?, ?, ?);"
-            conn.execute(SQL_INSERT, s)
-        time.sleep(5)
+    for s in s_arr:
+        SQL_INSERT = "INSERT INTO [dbo].[SensorData] (sensor_id, temperature, wind_speed, relative_humidity, co2) VALUES (?, ?, ?, ?, ?);"
+        conn.execute(SQL_INSERT, s)
 
     conn.close()
 
-    # db.set(func.SqlRowList({"sensor_id": s[0],
-    #                     "temperature": s[1],
-    #                     "wind_speed": s[2],
-    #                     "relative_humidity": s[3],
-    #                     "co2": s[4]}))
-
-    return func.HttpResponse(f"Hi me,\n\n{str}")
+    return func.HttpResponse(f"Hi me,\n\nInserted {sensors_num} sensor data")
