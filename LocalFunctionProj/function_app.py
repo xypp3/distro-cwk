@@ -1,8 +1,32 @@
+"""
+# TUTORIALS FOLLOWED:
+
+## Azure Functions (commandline)
+<https://learn.microsoft.com/en-us/azure/azure-functions/create-first-function-cli-python?tabs=linux%2Cbash%2Cazure-cli&pivots=python-mode-decorators>
+
+*includes setting additional setting variables*
+
+## Azure Serverless SQL Database (commandline)
+<https://learn.microsoft.com/en-us/azure/azure-functions/functions-add-output-binding-azure-sql-vs-code?pivots=programming-language-python&tabs=isolated-process%2Cv2>
+
+*use different remote call DB provider*
+
+## pyodbc with Azure
+<https://learn.microsoft.com/en-us/sql/connect/python/pyodbc/step-1-configure-development-environment-for-pyodbc-python-development?view=sql-server-ver16&tabs=linux>
+
+*Don't forget to install drivers*
+
+## Others
+- SQL tutorials n such
+"""
+
+
 import azure.functions as func
-import datetime
-import json
-import logging
+from azure.functions.decorators.core import DataType
+import pyodbc
 import random
+import time
+import os
 
 minTemp = 8.0
 maxTemp = 15.0
@@ -49,7 +73,11 @@ app = func.FunctionApp()
 
 @app.function_name(name="SensorGeneration")
 @app.route(route="getData")
-def test_function(req: func.HttpRequest) -> func.HttpResponse:
+@app.generic_output_binding(arg_name="db", type="sql",
+                            CommandText="dbo.SensorData",
+                            ConnectionStringSetting="SqlConnectionString",
+                            data_type=DataType.STRING)
+def test_function(req: func.HttpRequest, db: func.Out[func.SqlRow]) -> func.HttpResponse:
 
     sensors_num = req.params.get('num')
     if sensors_num:
@@ -59,8 +87,25 @@ def test_function(req: func.HttpRequest) -> func.HttpResponse:
 
     s_arr = init_sensor_array(sensors_num)
     str = s_arr.__str__() + "\n\n\n"
-    for i in range(5):
-        generate_data_sensor_array(s_arr)
-        str += s_arr.__str__() + "\n\n\n"
+    connection_string = os.environ["SqlConnectionString"]
+
+    # connect to db
+    conn = pyodbc.connect(connection_string, autocommit=True)
+
+    # insert data to cursor
+    times = 5
+    for i in range(times):
+        for s in s_arr:
+            SQL_INSERT = "INSERT INTO [dbo].[SensorData] (sensor_id, temperature, wind_speed, relative_humidity, co2) VALUES (?, ?, ?, ?, ?);"
+            conn.execute(SQL_INSERT, s)
+        time.sleep(5)
+
+    conn.close()
+
+    # db.set(func.SqlRowList({"sensor_id": s[0],
+    #                     "temperature": s[1],
+    #                     "wind_speed": s[2],
+    #                     "relative_humidity": s[3],
+    #                     "co2": s[4]}))
 
     return func.HttpResponse(f"Hi me,\n\n{str}")
