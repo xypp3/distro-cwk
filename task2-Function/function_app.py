@@ -27,6 +27,17 @@ import pyodbc
 import os
 
 
+def getMinMaxAvg(conn: pyodbc.Connection, num_of_sensor, column_name):
+    value = [[0, 0, 0]  for i in range(num_of_sensor)]
+
+    for i in range(num_of_sensor):
+        value[i][0] = conn.execute(f"SELECT MIN({column_name}) from [dbo].[SensorData] WHERE sensor_id={i}").fetchval()
+        value[i][1] = conn.execute(f"SELECT MAX({column_name}) from [dbo].[SensorData] WHERE sensor_id={i}").fetchval()
+        value[i][2] = conn.execute(f"SELECT AVG({column_name}) from [dbo].[SensorData] WHERE sensor_id={i}").fetchval()
+
+    return value
+
+
 app = func.FunctionApp()
 
 
@@ -41,14 +52,13 @@ def test_function(req: func.HttpRequest, db: func.Out[func.SqlRow]) -> func.Http
     connection_string = os.environ["SqlConnectionString"]
     conn = pyodbc.connect(connection_string, autocommit=True)
 
-    # select * distinct sensor_id
+    num_of_sensors = conn.execute("SELECT COUNT(DISTINCT sensor_id) FROM [dbo].[SensorData]").fetchval()
 
-    # for each sensor_id
-    #   select MAX
-    #   select MIN
-    #   select AVG
-    #   send batch requests
+    temp = getMinMaxAvg(conn, num_of_sensors, "temperature")
+    wind = getMinMaxAvg(conn, num_of_sensors, "wind_speed")
+    hum = getMinMaxAvg(conn, num_of_sensors, "relative_humidity")
+    co2 = getMinMaxAvg(conn, num_of_sensors, "co2")
 
     conn.close()
 
-    return func.HttpResponse("Hi me,\n\nSelected min, max, avg")
+    return func.HttpResponse(f"Hi me,\n\nSelected min, max, avg\n\n{temp}\n\n{wind}\n\n{hum}\n\n{co2}")
