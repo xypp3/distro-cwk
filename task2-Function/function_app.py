@@ -38,6 +38,23 @@ def getMinMaxAvg(conn: pyodbc.Connection, num_of_sensor, column_name):
     return value
 
 
+def createHtmlTable(data, title, len):
+    str = f"<h2>{title}</h2>"
+
+    str += "<table>"
+    str += "<tr><th>Sensor ID</th><th>Min</th><th>Max</th><th>Avg</th></tr>"
+    for i in range(len):
+        str += "<tr>"
+        str += f"<td>{i}</td>"
+        str += f"<td>{data[i][0]}</td>"
+        str += f"<td>{data[i][1]}</td>"
+        str += f"<td>{data[i][2]}</td>"
+        str += "</tr>"
+    str += "</table>"
+
+    return str
+
+
 app = func.FunctionApp()
 
 
@@ -59,6 +76,13 @@ def test_function(req: func.HttpRequest, db: func.Out[func.SqlRow]) -> func.Http
     hum = getMinMaxAvg(conn, num_of_sensors, "relative_humidity")
     co2 = getMinMaxAvg(conn, num_of_sensors, "co2")
 
+    html = "<html><body>"
+    html += createHtmlTable(temp, "Temperature Data", num_of_sensors)
+    html += createHtmlTable(wind, "Wind Speed Data", num_of_sensors)
+    html += createHtmlTable(hum, "Relative Humidity Data", num_of_sensors)
+    html += createHtmlTable(co2, "CO2 Data", num_of_sensors)
+    html += "</body></html>"
+
     conn.close()
 
-    return func.HttpResponse(f"Hi me,\n\nSelected min, max, avg\n\n{temp}\n\n{wind}\n\n{hum}\n\n{co2}")
+    return func.HttpResponse(html, mimetype="text/html")
