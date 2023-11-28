@@ -76,7 +76,7 @@ app = func.FunctionApp()
                             CommandText="dbo.SensorData",
                             ConnectionStringSetting="SqlConnectionString",
                             data_type=DataType.STRING)
-def test_function(req: func.HttpRequest, db: func.Out[func.SqlRow]) -> func.HttpResponse:
+def task_1(req: func.HttpRequest, db: func.Out[func.SqlRow]) -> func.HttpResponse:
 
     sensors_num = req.params.get('num')
     if sensors_num:
@@ -96,3 +96,57 @@ def test_function(req: func.HttpRequest, db: func.Out[func.SqlRow]) -> func.Http
     conn.close()
 
     return func.HttpResponse(f"Hi me,\n\nInserted {sensors_num} sensor data")
+
+
+def getMinMaxAvg(conn: pyodbc.Connection, num_of_sensor, column_name):
+    value = [[0, 0, 0]  for i in range(num_of_sensor)]
+
+    for i in range(num_of_sensor):
+        value[i][0] = conn.execute(f"SELECT MIN({column_name}) from [dbo].[SensorData] WHERE sensor_id={i}").fetchval()
+        value[i][1] = conn.execute(f"SELECT MAX({column_name}) from [dbo].[SensorData] WHERE sensor_id={i}").fetchval()
+        value[i][2] = conn.execute(f"SELECT AVG({column_name}) from [dbo].[SensorData] WHERE sensor_id={i}").fetchval()
+
+    return value
+
+
+def createHtmlTable(data, title, len):
+    str = f"<h2>{title}</h2>"
+
+    str += "<table>"
+    str += "<tr><th>Sensor ID</th><th>Min</th><th>Max</th><th>Avg</th></tr>"
+    for i in range(len):
+        str += "<tr>"
+        str += f"<td>{i}</td>"
+        str += f"<td>{data[i][0]}</td>"
+        str += f"<td>{data[i][1]}</td>"
+        str += f"<td>{data[i][2]}</td>"
+        str += "</tr>"
+    str += "</table>"
+
+    return str
+
+
+@app.function_name(name="SensorStatistics")
+@app.route(route="minMaxAvgData")
+def task_2(req: func.HttpRequest) -> func.HttpResponse:
+
+    connection_string = os.environ["SqlConnectionString"]
+    conn = pyodbc.connect(connection_string, autocommit=True)
+
+    num_of_sensors = conn.execute("SELECT COUNT(DISTINCT sensor_id) FROM [dbo].[SensorData]").fetchval()
+
+    temp = getMinMaxAvg(conn, num_of_sensors, "temperature")
+    wind = getMinMaxAvg(conn, num_of_sensors, "wind_speed")
+    hum = getMinMaxAvg(conn, num_of_sensors, "relative_humidity")
+    co2 = getMinMaxAvg(conn, num_of_sensors, "co2")
+
+    html = "<html><body>"
+    html += createHtmlTable(temp, "Temperature Data", num_of_sensors)
+    html += createHtmlTable(wind, "Wind Speed Data", num_of_sensors)
+    html += createHtmlTable(hum, "Relative Humidity Data", num_of_sensors)
+    html += createHtmlTable(co2, "CO2 Data", num_of_sensors)
+    html += "</body></html>"
+
+    conn.close()
+
+    return func.HttpResponse(html, mimetype="text/html")
