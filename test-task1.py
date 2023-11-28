@@ -3,7 +3,7 @@ import requests
 import time
 import os
 
-num_of_sensors = [1, 10, 50, 100]  #, 500, 1000]  #, 5000, 10000]
+num_of_sensors = [1, 10, 50, 100, 500, 1000, 5000, 10000]
 response_times = [-1.0 for i in range(len(num_of_sensors))]
 
 url = input("Function url: ")
