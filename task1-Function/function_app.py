@@ -18,6 +18,16 @@
 
 ## Others
 - SQL tutorials n such
+
+
+## Common Issues
+
+### Local pyodbc not working
+- Did you install drivers in addition to library
+
+### Database connection error only when deployed
+- python v10 has ODBC v17 installed!!!
+- for ODBC v18, use python v11
 """
 
 
@@ -25,7 +35,6 @@ import azure.functions as func
 from azure.functions.decorators.core import DataType
 import pyodbc
 import random
-import time
 import os
 
 minTemp = 8.0
@@ -86,13 +95,10 @@ def test_function(req: func.HttpRequest, db: func.Out[func.SqlRow]) -> func.Http
         sensors_num = 20
 
     s_arr = init_sensor_array(sensors_num)
-    str = s_arr.__str__() + "\n\n\n"
-    connection_string = os.environ["SqlConnectionString"]
 
-    # connect to db
+    connection_string = os.environ["SqlConnectionString"]
     conn = pyodbc.connect(connection_string, autocommit=True)
 
-    # insert data to cursor
     for s in s_arr:
         SQL_INSERT = "INSERT INTO [dbo].[SensorData] (sensor_id, temperature, wind_speed, relative_humidity, co2) VALUES (?, ?, ?, ?, ?);"
         conn.execute(SQL_INSERT, s)
