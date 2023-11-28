@@ -18,16 +18,6 @@
 
 ## Others
 - SQL tutorials n such
-
-
-## Common Issues
-
-### Local pyodbc not working
-- Did you install drivers in addition to library
-
-### Database connection error only when deployed
-- python v10 has ODBC v17 installed!!!
-- for ODBC v18, use python v11
 """
 
 
