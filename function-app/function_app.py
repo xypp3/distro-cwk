@@ -16,16 +16,20 @@
 
 *Don't forget to install drivers*
 
+## sql trigger with python v2
+<https://github.com/Azure/azure-functions-sql-extension/blob/main/samples/samples-python-v2/function_app.py>
+
 ## Others
 - SQL tutorials n such
 """
 
-
 import azure.functions as func
-from azure.functions.decorators.core import DataType
 import pyodbc
 import random
 import os
+import logging
+import datetime
+from azure.functions.decorators.core import DataType
 
 minTemp = 8.0
 maxTemp = 15.0
@@ -82,7 +86,7 @@ def task_1(req: func.HttpRequest) -> func.HttpResponse:
 
     s_arr = init_sensor_array(sensors_num)
 
-    connection_string = os.environ["SqlConnectionString"]
+    connection_string = os.environ["SqlDriver"] + os.environ["SqlConnectionString"]
     conn = pyodbc.connect(connection_string, autocommit=True)
 
     for s in s_arr:
@@ -115,7 +119,7 @@ def createHtmlTable(data, title, len, data_index):
 @app.route(route="minMaxAvgData")
 def task_2(req: func.HttpRequest) -> func.HttpResponse:
 
-    connection_string = os.environ["SqlConnectionString"]
+    connection_string = os.environ["SqlDriver"] + os.environ["SqlConnectionString"]
     conn = pyodbc.connect(connection_string, autocommit=True)
 
     num_of_sensors = conn.execute("SELECT COUNT(DISTINCT sensor_id) FROM [dbo].[SensorData]").fetchval()
@@ -146,3 +150,84 @@ def task_2(req: func.HttpRequest) -> func.HttpResponse:
     conn.close()
 
     return func.HttpResponse(html, mimetype="text/html")
+
+
+@app.function_name(name="TimerSensorGeneration")
+@app.schedule(schedule="*/5 * * * * *",
+              arg_name="mytimer",
+              run_on_startup=True)
+def task_3_gen(mytimer) -> None:
+    s_arr = init_sensor_array(20)
+
+    connection_string = os.environ["SqlDriver"] + os.environ["SqlConnectionString"]
+    conn = pyodbc.connect(connection_string, autocommit=True)
+
+    for s in s_arr:
+        SQL_INSERT = "INSERT INTO [dbo].[SensorData] (sensor_id, temperature, wind_speed, relative_humidity, co2) VALUES (?, ?, ?, ?, ?);"
+        conn.execute(SQL_INSERT, s)
+
+    conn.close()
+
+    utc_timestamp = datetime.datetime.utcnow().replace(tzinfo=datetime.timezone.utc).isoformat()
+    logging.info(f"At {utc_timestamp}")
+
+
+""" Issues/ Changes for function below
+
+## Connection string must exclude driver
+- Split connection string into SqlDriver + SqlConnectionString
+
+## Azure DB
+ALTER DATABASE [distro-db]
+SET CHANGE_TRACKING = ON
+(CHANGE_RETENTION = 2 DAYS, AUTO_CLEANUP = ON);
+
+ALTER TABLE [dbo].[SensorData]
+ENABLE CHANGE_TRACKING;
+
+"""
+
+
+@app.function_name(name="DBTriggerSensorStatistics")
+# @app.route(route="sqlTrigger")
+@app.generic_trigger(arg_name="data", type="sqlTrigger",
+                     TableName="SensorData",
+                     ConnectionStringSetting="SqlConnectionString",
+                     data_type=DataType.STRING)
+def task_3_sql_trigger(data) -> None:
+
+    # connection_string = os.environ["SqlDriver"] + os.environ["SqlConnectionString"]
+    # conn = pyodbc.connect(connection_string, autocommit=True)
+    #
+    # num_of_sensors = conn.execute("SELECT COUNT(DISTINCT sensor_id) FROM [dbo].[SensorData]").fetchval()
+    #
+    # temp = "temperature"
+    # wind = "wind_speed"
+    # hum = "relative_humidity"
+    # co2 = "co2"
+    #
+    # QUERY = f"""
+    #     SELECT
+    #      MIN({temp}), MAX({temp}), AVG({temp}),
+    #      MIN({wind}), MAX({wind}), AVG({wind}),
+    #      MIN({hum}), MAX({hum}), AVG({hum}),
+    #      MIN({co2}), MAX({co2}), AVG({co2})
+    #      FROM [dbo].[SensorData]
+    #      GROUP BY sensor_id;
+    #     """
+    # data = conn.execute(QUERY).fetchall()
+    #
+    # html = "<html><body>"
+    # html += createHtmlTable(data, "Temperature Data", num_of_sensors, 0)
+    # html += createHtmlTable(data, "Wind Speed Data", num_of_sensors, 1)
+    # html += createHtmlTable(data, "Relative Humidity Data", num_of_sensors, 2)
+    # html += createHtmlTable(data, "CO2 Data", num_of_sensors, 3)
+    # html += "</body></html>"
+    #
+    # conn.close()
+
+    # logging.info(html)
+
+    task_2()
+
+    # return func.HttpResponse(html, mimetype="text/html")
