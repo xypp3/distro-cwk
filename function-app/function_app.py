@@ -72,11 +72,7 @@ app = func.FunctionApp()
 
 @app.function_name(name="SensorGeneration")
 @app.route(route="getData")
-@app.generic_output_binding(arg_name="db", type="sql",
-                            CommandText="dbo.SensorData",
-                            ConnectionStringSetting="SqlConnectionString",
-                            data_type=DataType.STRING)
-def task_1(req: func.HttpRequest, db: func.Out[func.SqlRow]) -> func.HttpResponse:
+def task_1(req: func.HttpRequest) -> func.HttpResponse:
 
     sensors_num = req.params.get('num')
     if sensors_num:
@@ -98,18 +94,7 @@ def task_1(req: func.HttpRequest, db: func.Out[func.SqlRow]) -> func.HttpRespons
     return func.HttpResponse(f"Hi me,\n\nInserted {sensors_num} sensor data")
 
 
-def getMinMaxAvg(conn: pyodbc.Connection, num_of_sensor, column_name):
-    value = [[0, 0, 0]  for i in range(num_of_sensor)]
-
-    for i in range(num_of_sensor):
-        value[i][0] = conn.execute(f"SELECT MIN({column_name}) from [dbo].[SensorData] WHERE sensor_id={i}").fetchval()
-        value[i][1] = conn.execute(f"SELECT MAX({column_name}) from [dbo].[SensorData] WHERE sensor_id={i}").fetchval()
-        value[i][2] = conn.execute(f"SELECT AVG({column_name}) from [dbo].[SensorData] WHERE sensor_id={i}").fetchval()
-
-    return value
-
-
-def createHtmlTable(data, title, len):
+def createHtmlTable(data, title, len, data_index):
     str = f"<h2>{title}</h2>"
 
     str += "<table>"
@@ -117,9 +102,9 @@ def createHtmlTable(data, title, len):
     for i in range(len):
         str += "<tr>"
         str += f"<td>{i}</td>"
-        str += f"<td>{data[i][0]}</td>"
-        str += f"<td>{data[i][1]}</td>"
-        str += f"<td>{data[i][2]}</td>"
+        str += f"<td>{data[i][0 + 3*data_index]}</td>"
+        str += f"<td>{data[i][1 + 3*data_index]}</td>"
+        str += f"<td>{data[i][2 + 3*data_index]}</td>"
         str += "</tr>"
     str += "</table>"
 
@@ -135,16 +120,27 @@ def task_2(req: func.HttpRequest) -> func.HttpResponse:
 
     num_of_sensors = conn.execute("SELECT COUNT(DISTINCT sensor_id) FROM [dbo].[SensorData]").fetchval()
 
-    temp = getMinMaxAvg(conn, num_of_sensors, "temperature")
-    wind = getMinMaxAvg(conn, num_of_sensors, "wind_speed")
-    hum = getMinMaxAvg(conn, num_of_sensors, "relative_humidity")
-    co2 = getMinMaxAvg(conn, num_of_sensors, "co2")
+    temp = "temperature"
+    wind = "wind_speed"
+    hum = "relative_humidity"
+    co2 = "co2"
+
+    QUERY = f"""
+        SELECT
+         MIN({temp}), MAX({temp}), AVG({temp}),
+         MIN({wind}), MAX({wind}), AVG({wind}),
+         MIN({hum}), MAX({hum}), AVG({hum}),
+         MIN({co2}), MAX({co2}), AVG({co2})
+         FROM [dbo].[SensorData]
+         GROUP BY sensor_id;
+        """
+    data = conn.execute(QUERY).fetchall()
 
     html = "<html><body>"
-    html += createHtmlTable(temp, "Temperature Data", num_of_sensors)
-    html += createHtmlTable(wind, "Wind Speed Data", num_of_sensors)
-    html += createHtmlTable(hum, "Relative Humidity Data", num_of_sensors)
-    html += createHtmlTable(co2, "CO2 Data", num_of_sensors)
+    html += createHtmlTable(data, "Temperature Data", num_of_sensors, 0)
+    html += createHtmlTable(data, "Wind Speed Data", num_of_sensors, 1)
+    html += createHtmlTable(data, "Relative Humidity Data", num_of_sensors, 2)
+    html += createHtmlTable(data, "CO2 Data", num_of_sensors, 3)
     html += "</body></html>"
 
     conn.close()
