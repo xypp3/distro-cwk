@@ -195,39 +195,31 @@ ENABLE CHANGE_TRACKING;
                      ConnectionStringSetting="SqlConnectionString",
                      data_type=DataType.STRING)
 def task_3_sql_trigger(data) -> None:
+    connection_string = os.environ["SqlDriver"] + os.environ["SqlConnectionString"]
+    conn = pyodbc.connect(connection_string, autocommit=True)
 
-    # connection_string = os.environ["SqlDriver"] + os.environ["SqlConnectionString"]
-    # conn = pyodbc.connect(connection_string, autocommit=True)
-    #
-    # num_of_sensors = conn.execute("SELECT COUNT(DISTINCT sensor_id) FROM [dbo].[SensorData]").fetchval()
-    #
-    # temp = "temperature"
-    # wind = "wind_speed"
-    # hum = "relative_humidity"
-    # co2 = "co2"
-    #
-    # QUERY = f"""
-    #     SELECT
-    #      MIN({temp}), MAX({temp}), AVG({temp}),
-    #      MIN({wind}), MAX({wind}), AVG({wind}),
-    #      MIN({hum}), MAX({hum}), AVG({hum}),
-    #      MIN({co2}), MAX({co2}), AVG({co2})
-    #      FROM [dbo].[SensorData]
-    #      GROUP BY sensor_id;
-    #     """
-    # data = conn.execute(QUERY).fetchall()
-    #
-    # html = "<html><body>"
-    # html += createHtmlTable(data, "Temperature Data", num_of_sensors, 0)
-    # html += createHtmlTable(data, "Wind Speed Data", num_of_sensors, 1)
-    # html += createHtmlTable(data, "Relative Humidity Data", num_of_sensors, 2)
-    # html += createHtmlTable(data, "CO2 Data", num_of_sensors, 3)
-    # html += "</body></html>"
-    #
-    # conn.close()
+    num_of_sensors = conn.execute("SELECT COUNT(DISTINCT sensor_id) FROM [dbo].[SensorData]").fetchval()
 
-    # logging.info(html)
+    temp = "temperature"
+    wind = "wind_speed"
+    hum = "relative_humidity"
+    co2 = "co2"
 
-    task_2()
+    QUERY = f"""
+        SELECT
+         MIN({temp}), MAX({temp}), AVG({temp}),
+         MIN({wind}), MAX({wind}), AVG({wind}),
+         MIN({hum}), MAX({hum}), AVG({hum}),
+         MIN({co2}), MAX({co2}), AVG({co2})
+         FROM [dbo].[SensorData]
+         GROUP BY sensor_id;
+        """
+    table = conn.execute(QUERY).fetchall()
 
-    # return func.HttpResponse(html, mimetype="text/html")
+    conn.execute("TRUNCATE TABLE [dbo].[liveStats]")
+    for i in range(num_of_sensors):
+        conn.execute("INSERT INTO [dbo].[liveStats] (min_temperature, max_temperature, avg_temperature, min_wind_speed, max_wind_speed, avg_wind_speed, min_relative_humidity, max_relative_humidity, avg_relative_humidity, min_co2, max_co2, avg_co2) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
+                     table[i],
+                     )
+
+    conn.close()
